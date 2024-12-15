@@ -25,7 +25,7 @@ class OpenApiRouter(CompiledRouter):
         for http_method, definition in http_methods.items():
             try:
                 (dest_module, dest_method, dest_class, dest_file) = self.__get_destination_info(
-                    definition, http_method
+                    definition, http_method, self.__class__.__name__
                 )
             except:
                 continue
@@ -98,7 +98,7 @@ class OpenApiRouter(CompiledRouter):
         return openapi, path
 
     @staticmethod
-    def __get_destination_info(definition, fallback):
+    def __get_destination_info(definition, fallback, calling_class):
         """Gets destination module, class, method, and filename from openapi
         method definition. Looks for either operationId or x-falcon
         properties. If both are defined operationId takes precedence.
@@ -110,7 +110,10 @@ class OpenApiRouter(CompiledRouter):
         Returns tuple (module, class, method, file_name)"""
 
         # gets the file and dir of whomever instantiated this object
-        caller_file = abspath((stack()[3])[1])
+        if calling_class == "OpenApiRouter":
+            caller_file = abspath((stack()[2])[1])
+        else:
+            caller_file = abspath((stack()[3])[1])
         caller_dir = dirname(caller_file) + "/"
 
         if "operationId" in definition:

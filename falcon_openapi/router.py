@@ -1,7 +1,8 @@
 import json
 from importlib.util import module_from_spec, spec_from_file_location
 from inspect import stack
-from os.path import basename, abspath, dirname
+from logging import getLogger
+from os.path import abspath, dirname
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -15,7 +16,7 @@ class OpenApiRouter(CompiledRouter):
         super().__init__()
 
         (self.openapi, self.base_path) = self.__load_spec(file_path, raw_json, raw_yaml)
-    
+
     def _process_http_methods(self, http_methods):
         """
         Process http methods from OpenAPI sprecifications
@@ -48,7 +49,7 @@ class OpenApiRouter(CompiledRouter):
             method_map[http_method] = Method
         
         return openapi_map
-    
+
     def _add_route(self, openapi_map, path, **kwargs):
         """
         Add route from OpenAPI map
@@ -109,15 +110,11 @@ class OpenApiRouter(CompiledRouter):
         Returns tuple (module, class, method, file_name)"""
 
         # gets the file and dir of whomever instantiated this object
-        caller_file = abspath((stack()[2])[1])
+        caller_file = abspath((stack()[3])[1])
         caller_dir = dirname(caller_file) + "/"
-        caller_module = basename(dirname(caller_file))
 
         if "operationId" in definition:
             operationId = definition["operationId"]
-            if operationId[0] == '.':
-                operationId = caller_module + operationId
-                caller_dir = caller_dir[:-len(caller_module)-1]
             parts = operationId.split(".")
             op_method = parts.pop()
             op_class = parts.pop()
@@ -140,7 +137,7 @@ class OpenApiRouter(CompiledRouter):
             raise ValueError("No operationId or x-falcon found in definition")
 
         return (op_module, op_method, op_class, op_file)
-    
+
 
 class OpenApiSyncRouter(OpenApiRouter):
     
@@ -151,6 +148,7 @@ class OpenApiSyncRouter(OpenApiRouter):
             path = self.base_path + path
             openapi_map = self._process_http_methods(http_methods)
             self._add_route(openapi_map, path)
+
 
 
 class OpenApiAsyncRouter(OpenApiRouter):
@@ -168,3 +166,4 @@ class OpenApiAsyncRouter(OpenApiRouter):
                 '_asgi': True
             }
             self._add_route(openapi_map, path, **kwargs)
+

@@ -10,10 +10,10 @@ import yaml
 from falcon import routing
 from falcon.routing.compiled import CompiledRouter
 
-
 class OpenApiRouter(CompiledRouter):
-    def __init__(self, file_path="", raw_json="", raw_yaml=""):
+    def __init__(self, file_path="", raw_json="", raw_yaml="", instance_args={}):
         super().__init__()
+        self.instance_args = instance_args
 
         (self.openapi, self.base_path) = self.__load_spec(file_path, raw_json, raw_yaml)
 
@@ -22,6 +22,10 @@ class OpenApiRouter(CompiledRouter):
         Process http methods from OpenAPI sprecifications
         """
         openapi_map = {}
+        if http_methods.get('x-class-args'):
+            args = http_methods.pop('x-class-args')
+        else:
+            args = []
         for http_method, definition in http_methods.items():
             try:
                 (dest_module, dest_method, dest_class, dest_file) = self.__get_destination_info(
@@ -37,7 +41,7 @@ class OpenApiRouter(CompiledRouter):
                 mod_spec = spec_from_file_location(dest_module, dest_file)
                 module = module_from_spec(mod_spec)
                 mod_spec.loader.exec_module(module)
-                Class = getattr(module, dest_class)()
+                Class = getattr(module, dest_class)(*[self.instance_args[arg] for arg in args])
 
                 openapi_map[class_name] = {}
                 openapi_map[class_name]["class"] = Class
@@ -144,8 +148,8 @@ class OpenApiRouter(CompiledRouter):
 
 class OpenApiSyncRouter(OpenApiRouter):
     
-    def __init__(self, file_path="", raw_json="", raw_yaml=""):
-        super().__init__(file_path=file_path, raw_json=raw_json, raw_yaml=raw_yaml)
+    def __init__(self, file_path="", raw_json="", raw_yaml="", instance_args={}):
+        super().__init__(file_path=file_path, raw_json=raw_json, raw_yaml=raw_yaml, instance_args=instance_args)
 
         for path, http_methods in self.openapi["paths"].items():
             path = self.base_path + path
@@ -156,8 +160,8 @@ class OpenApiSyncRouter(OpenApiRouter):
 
 class OpenApiAsyncRouter(OpenApiRouter):
     
-    def __init__(self, file_path="", raw_json="", raw_yaml=""):
-        super().__init__(file_path=file_path, raw_json=raw_json, raw_yaml=raw_yaml)
+    def __init__(self, file_path="", raw_json="", raw_yaml="", instance_args={}):
+        super().__init__(file_path=file_path, raw_json=raw_json, raw_yaml=raw_yaml, instance_args=instance_args)
 
         for path, http_methods in self.openapi["paths"].items():
             path = self.base_path + path
@@ -169,4 +173,3 @@ class OpenApiAsyncRouter(OpenApiRouter):
                 '_asgi': True
             }
             self._add_route(openapi_map, path, **kwargs)
-
